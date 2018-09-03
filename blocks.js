@@ -2059,8 +2059,7 @@ SyntaxElementMorph.prototype.exportPictureWithResult = function (aBubble) {
     // request to open pic in new window.
     ide.saveCanvasAs(
         pic,
-        ide.projetName || localize('Untitled') + ' ' + localize('script pic'),
-        true
+        ide.projectName || localize('Untitled') + ' ' + localize('script pic')
     );
 };
 
@@ -2604,12 +2603,11 @@ BlockMorph.prototype.userMenu = function () {
             );
             ide.saveCanvasAs(
                 myself.topBlock().scriptPic(),
-                ide.projetName || localize('Untitled') + ' ' +
-                    localize('script pic'),
-                true // request new window
+                (ide.projectName || localize('Untitled')) + ' ' +
+                    localize('script pic')
             );
         },
-        'open a new window\nwith a picture of this script'
+        'download a picture of this script'
     );
     if (proc) {
         if (vNames.length) {
@@ -3563,6 +3561,11 @@ BlockMorph.prototype.outline = function (color, border) {
 
 // BlockMorph zebra coloring
 
+BlockMorph.prototype.getCategoryColor = function (category) {
+    return SpriteMorph.prototype.blockColor[category] ||
+        SpriteMorph.prototype.blockColor.other;
+};
+
 BlockMorph.prototype.fixBlockColor = function (nearestBlock, isForced) {
     var nearest = nearestBlock,
         clr,
@@ -3590,7 +3593,7 @@ BlockMorph.prototype.fixBlockColor = function (nearestBlock, isForced) {
         }
     }
     if (!nearest) { // top block
-        clr = SpriteMorph.prototype.blockColor[this.category];
+        clr = this.getCategoryColor(this.category);
         if (!this.color.eq(clr)) {
             this.alternateBlockColor();
         }
@@ -3599,7 +3602,7 @@ BlockMorph.prototype.fixBlockColor = function (nearestBlock, isForced) {
             this.alternateBlockColor();
         }
     } else if (this.category && !this.color.eq(
-            SpriteMorph.prototype.blockColor[this.category]
+            this.getCategoryColor(this.category)
         )) {
         this.alternateBlockColor();
     }
@@ -3609,7 +3612,7 @@ BlockMorph.prototype.fixBlockColor = function (nearestBlock, isForced) {
 };
 
 BlockMorph.prototype.forceNormalColoring = function () {
-    var clr = SpriteMorph.prototype.blockColor[this.category];
+    var clr = this.getCategoryColor(this.category);
     this.setColor(clr, true); // silently
     this.setLabelColor(
         new Color(255, 255, 255),
@@ -3620,7 +3623,7 @@ BlockMorph.prototype.forceNormalColoring = function () {
 };
 
 BlockMorph.prototype.alternateBlockColor = function () {
-    var clr = SpriteMorph.prototype.blockColor[this.category];
+    var clr = this.getCategoryColor(this.category);
 
     if (this.color.eq(clr)) {
         this.setColor(
@@ -3637,13 +3640,13 @@ BlockMorph.prototype.alternateBlockColor = function () {
 
 BlockMorph.prototype.ghost = function () {
     this.setColor(
-        SpriteMorph.prototype.blockColor[this.category].lighter(35)
+        this.getCategoryColor(this.category).lighter(35)
     );
 };
 
 BlockMorph.prototype.fixLabelColor = function () {
     if (this.zebraContrast > 0 && this.category) {
-        var clr = SpriteMorph.prototype.blockColor[this.category];
+        var clr = this.getCategoryColor(this.category);
         if (this.color.eq(clr)) {
             this.setLabelColor(
                 new Color(255, 255, 255),
@@ -6249,9 +6252,8 @@ ScriptsMorph.prototype.exportScriptsPicture = function () {
     if (pic) {
         ide.saveCanvasAs(
             pic,
-            ide.projetName || localize('Untitled') + ' ' +
-                localize('script pic'),
-            true // request new window
+            ide.projectName || localize('Untitled') + ' ' +
+                localize('script pic')
         );
     }
 };
@@ -6508,21 +6510,16 @@ ScriptsMorph.prototype.addBlock = function (block) {
 
 ScriptsMorph.prototype.setBlockPosition = function (block, hand) {
     var position = block.position(),
-        originPosition;
+        originPosition,
+        revertPosition;
+
+    originPosition = hand.grabOrigin.position.add(hand.grabOrigin.origin.position());
+    revertPosition = function() {
+        block.setPosition(originPosition);
+    };
 
     if (hand) {
-        if (hand.grabOrigin.origin === this) {  // on the same script
-            if (SnapActions.mightRejectActions()) {
-                originPosition = hand.grabOrigin.position.add(hand.grabOrigin.origin.position());
-                block.setPosition(originPosition);
-            }
-        } else {  // move between scripts!
-
-            if (SnapActions.mightRejectActions()) {
-                // Revert the block back to the origin in case this fails
-                originPosition = hand.grabOrigin.position.add(hand.grabOrigin.origin.position());
-                block.setPosition(originPosition);
-            }
+        if (hand.grabOrigin.origin !== this) {  // move between scripts morph
             hand.grabOrigin.origin.add(block);
 
             // copy the blocks and add them to the new editor
@@ -6534,10 +6531,13 @@ ScriptsMorph.prototype.setBlockPosition = function (block, hand) {
                 .then(function() {
                     return SnapActions.removeBlock(block);
                 });
+        } else if (SnapActions.isReadOnly()) {
+            revertPosition();
         }
     }
 
-    SnapActions.setBlockPosition(block, position);
+    return SnapActions.setBlockPosition(block, position)
+        .catch(revertPosition);
 };
 
 // ScriptsMorph events
@@ -13053,12 +13053,11 @@ CommentMorph.prototype.userMenu = function () {
             var ide = myself.parentThatIsA(IDE_Morph);
             ide.saveCanvasAs(
                 myself.fullImageClassic(),
-                ide.projetName || localize('Untitled') + ' ' +
-                    localize('comment pic'),
-                true // request new window
+                ide.projectName || localize('Untitled') + ' ' +
+                    localize('comment pic')
             );
         },
-        'open a new window\nwith a picture of this comment'
+        'download a picture of this comment'
     );
     return menu;
 };
